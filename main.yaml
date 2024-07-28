@@ -1,0 +1,147 @@
+---
+- name: Setup Boilerplate Application
+  hosts: hng
+  become: yes
+
+  vars:
+    pg_admin_user: "admin"
+    pg_admin_password: "{{ lookup('password', '/dev/null length=20 chars=ascii_letters') }}"
+
+  tasks:
+    - name: Create hng user with sudo privileges
+      user:
+        name: hng
+        groups: sudo
+        append: yes
+
+    - name: Install necessary packages
+      apt:
+        name: "{{ item }}"
+        state: present
+        update_cache: yes
+      loop:
+        - git
+        - python3-pip
+        - postgresql
+        - postgresql-contrib
+        - rabbitmq-server
+        - nginx
+
+    - name: Clone the repository
+      git:
+        repo: 'https://github.com/hngprojects/hng_boilerplate_python_fastapi_web'
+        dest: /opt/stage_5b
+        version: devops
+        force: yes
+      become_user: hng
+
+    - name: Install Python dependencies
+      pip:
+        requirements: /opt/stage_5b/requirements.txt
+
+    - name: Setup PostgreSQL
+      become: yes
+      become_user: postgres
+      block:
+        - name: Ensure PostgreSQL service is running
+          service:
+            name: postgresql
+            state: started
+            enabled: yes
+
+        - name: Create PostgreSQL database and user
+          postgresql_db:
+            name: stage_5b
+            encoding: UTF8
+            state: present
+
+        - name: Create PostgreSQL user with password
+          postgresql_user:
+            name: "{{ pg_admin_user }}"
+            password: "{{ pg_admin_password }}"
+            priv: "ALL"
+            state: present
+
+    - name: Save PostgreSQL credentials
+      copy:
+        dest: /var/secrets/pg_pw.txt
+        content: |
+          USER={{ pg_admin_user }}
+          PASSWORD={{ pg_admin_password }}
+      owner: root
+      group: root
+      mode: '0600'
+
+    - name: Start the application
+      shell: "nohup python3 /opt/stage_5b/main.py &"
+
+    - name: Configure Nginx
+      block:
+        - name: Remove default Nginx configuration
+          file:
+            path: /etc/nginx/sites-enabled/default
+            state: absent
+
+        - name: Set up Nginx reverse proxy
+          copy:
+            dest: /etc/nginx/sites-available/stage_5b
+            content: |
+              server {
+                  listen 80;
+                  server_name _;
+
+                  location / {
+                      proxy_pass http://127.0.0.1:3000;
+                      proxy_set_header Host $host;
+                      proxy_set_header X-Real-IP $remote_addr;
+                      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                      proxy_set_header X-Forwarded-Proto $scheme;
+                  }
+              }
+          notify: Restart nginx
+
+        - name: Enable stage_5b site
+          file:
+            src: /etc/nginx/sites-available/stage_5b
+            dest: /etc/nginx/sites-enabled/stage_5b
+            state: link
+
+    - name: Configure logging
+      block:
+        - name: Ensure log directory exists
+          file:
+            path: /var/log/stage_5b
+            state: directory
+            owner: hng
+            group: hng
+
+        - name: Set up stderr log
+          copy:
+            dest: /etc/systemd/system/stage_5b.service
+            content: |
+              [Unit]
+              Description=Stage 5B Application
+
+              [Service]
+              ExecStart=/usr/bin/python3 /opt/stage_5b/main.py
+              StandardOutput=file:/var/log/stage_5b/out.log
+              StandardError=file:/var/log/stage_5b/error.log
+              User=hng
+              Group=hng
+              Restart=always
+
+              [Install]
+              WantedBy=multi-user.target
+          notify: Reload systemd
+
+handlers:
+  - name: Restart nginx
+    service:
+      name: nginx
+      state: restarted
+
+  - name: Reload systemd
+    systemd:
+      daemon_reload: yes
+      state: restarted
+      name: stage_5b.service
