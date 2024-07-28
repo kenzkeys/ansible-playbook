@@ -6,6 +6,7 @@
   vars:
     pg_admin_user: "admin"
     pg_admin_password: "{{ lookup('password', '/dev/null length=20 chars=ascii_letters') }}"
+    app_dir: /opt/stage_5b
 
   tasks:
     - name: Create hng user with sudo privileges
@@ -13,6 +14,14 @@
         name: hng
         groups: sudo
         append: yes
+
+    - name: Create /var/secrets directory
+      file:
+        path: /var/secrets
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
 
     - name: Install necessary packages
       apt:
@@ -25,19 +34,34 @@
         - postgresql
         - postgresql-contrib
         - rabbitmq-server
-        - nginx
+        - curl
+        - apt-transport-https
+        - ca-certificates
+        - software-properties-common
+
+    - name: Install Nginx 1.26
+      shell: |
+        echo "deb http://nginx.org/packages/ubuntu/ $(lsb_release -cs) nginx" | tee /etc/apt/sources.list.d/nginx.list
+        curl -fsSL https://nginx.org/keys/nginx_signing.key | apt-key add -
+        apt-get update
+        apt-get install -y nginx=1.26.*
 
     - name: Clone the repository
       git:
         repo: 'https://github.com/hngprojects/hng_boilerplate_python_fastapi_web'
-        dest: /opt/stage_5b
+        dest: "{{ app_dir }}"
         version: devops
         force: yes
       become_user: hng
+      environment:
+        GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
 
     - name: Install Python dependencies
       pip:
-        requirements: /opt/stage_5b/requirements.txt
+        requirements: "{{ app_dir }}/requirements.txt"
+        virtualenv: "{{ app_dir }}/venv"
+        virtualenv_command: /usr/bin/python3 -m venv
+      become_user: hng
 
     - name: Setup PostgreSQL
       become: yes
@@ -77,7 +101,7 @@
         mode: '0600'
 
     - name: Start the application
-      shell: "nohup python3 /opt/stage_5b/main.py &"
+      shell: "{{ app_dir }}/venv/bin/python3 {{ app_dir }}/main.py &"
 
     - name: Configure Nginx
       block:
@@ -119,7 +143,7 @@
             owner: hng
             group: hng
 
-        - name: Set up stderr log
+        - name: Set up stderr and stdout logging
           copy:
             dest: /etc/systemd/system/stage_5b.service
             content: |
@@ -127,7 +151,7 @@
               Description=Stage 5B Application
 
               [Service]
-              ExecStart=/usr/bin/python3 /opt/stage_5b/main.py
+              ExecStart={{ app_dir }}/venv/bin/python3 {{ app_dir }}/main.py
               StandardOutput=file:/var/log/stage_5b/out.log
               StandardError=file:/var/log/stage_5b/error.log
               User=hng
