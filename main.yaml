@@ -62,15 +62,19 @@
             priv: "ALL"
             state: present
 
-    - name: Save PostgreSQL credentials
+    - name: Save PostgreSQL credentials to a file
       copy:
         dest: /var/secrets/pg_pw.txt
         content: |
           USER={{ pg_admin_user }}
           PASSWORD={{ pg_admin_password }}
-      owner: root
-      group: root
-      mode: '0600'
+    
+    - name: Ensure correct ownership and permissions for the credentials file
+      file:
+        path: /var/secrets/pg_pw.txt
+        owner: root
+        group: root
+        mode: '0600'
 
     - name: Start the application
       shell: "nohup python3 /opt/stage_5b/main.py &"
