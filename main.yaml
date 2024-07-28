@@ -46,15 +46,20 @@
         apt-get update
         apt-get install -y nginx=1.26.*
 
-    - name: Clone the repository
+    - name: Clone the repository as root
       git:
         repo: 'https://github.com/hngprojects/hng_boilerplate_python_fastapi_web'
         dest: "{{ app_dir }}"
         version: devops
         force: yes
-      become_user: hng
-      environment:
-        GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
+
+    - name: Change ownership of the cloned repository to hng user
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: hng
+        group: hng
+        recurse: yes
 
     - name: Install Python dependencies
       pip:
