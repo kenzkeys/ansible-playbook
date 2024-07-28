@@ -134,14 +134,14 @@
               WantedBy=multi-user.target
           notify: Reload systemd
 
-handlers:
-  - name: Restart nginx
-    service:
-      name: nginx
-      state: restarted
+  handlers:
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted
 
-  - name: Reload systemd
-    systemd:
-      daemon_reload: yes
-      state: restarted
-      name: stage_5b.service
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+        state: restarted
+        name: stage_5b.service
