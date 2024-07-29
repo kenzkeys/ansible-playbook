@@ -60,17 +60,17 @@
         virtualenv: "{{ app_dir }}/venv"
         virtualenv_command: /usr/bin/python3 -m venv
 
-    - name: Setup PostgreSQL
+    - name: Ensure PostgreSQL service is running
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
+
+    - name: Create PostgreSQL database and user
       become: yes
       become_user: postgres
       block:
-        - name: Ensure PostgreSQL service is running
-          service:
-            name: postgresql
-            state: started
-            enabled: yes
-
-        - name: Create PostgreSQL database and user
+        - name: Create PostgreSQL database
           postgresql_db:
             name: stage_5b
             encoding: UTF8
