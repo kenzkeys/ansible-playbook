@@ -31,6 +31,7 @@
       loop:
         - git
         - python3-pip
+        - python3-venv
         - postgresql
         - postgresql-contrib
         - rabbitmq-server
