@@ -53,20 +53,11 @@
         version: devops
         force: yes
 
-    - name: Change ownership of the cloned repository to hng user
-      file:
-        path: "{{ app_dir }}"
-        state: directory
-        owner: hng
-        group: hng
-        recurse: yes
-
     - name: Install Python dependencies
       pip:
         requirements: "{{ app_dir }}/requirements.txt"
         virtualenv: "{{ app_dir }}/venv"
         virtualenv_command: /usr/bin/python3 -m venv
-      become_user: hng
 
     - name: Setup PostgreSQL
       become: yes
@@ -97,10 +88,6 @@
         content: |
           USER={{ pg_admin_user }}
           PASSWORD={{ pg_admin_password }}
-    
-    - name: Ensure correct ownership and permissions for the credentials file
-      file:
-        path: /var/secrets/pg_pw.txt
         owner: root
         group: root
         mode: '0600'
@@ -145,8 +132,6 @@
           file:
             path: /var/log/stage_5b
             state: directory
-            owner: hng
-            group: hng
 
         - name: Set up stderr and stdout logging
           copy:
@@ -159,13 +144,36 @@
               ExecStart={{ app_dir }}/venv/bin/python3 {{ app_dir }}/main.py
               StandardOutput=file:/var/log/stage_5b/out.log
               StandardError=file:/var/log/stage_5b/error.log
-              User=hng
-              Group=hng
+              User=root
+              Group=root
               Restart=always
 
               [Install]
               WantedBy=multi-user.target
           notify: Reload systemd
+
+    - name: Change ownership of application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: hng
+        group: hng
+        recurse: yes
+
+    - name: Change ownership of log directory
+      file:
+        path: /var/log/stage_5b
+        state: directory
+        owner: hng
+        group: hng
+        recurse: yes
+
+    - name: Change ownership of PostgreSQL credentials file
+      file:
+        path: /var/secrets/pg_pw.txt
+        owner: hng
+        group: hng
+        mode: '0600'
 
   handlers:
     - name: Restart nginx
