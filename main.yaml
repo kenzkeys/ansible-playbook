@@ -318,7 +318,7 @@
         state: restarted
 
   # Logging in place with proper handlers for different steps
-   post_tasks:
+  post_tasks:
     - name: Log Step 6 Output
       local_action: copy content="{{ git_output.stdout }}" dest="git_output.log"
       when: git_output is defined
