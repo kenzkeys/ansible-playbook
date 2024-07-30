@@ -134,7 +134,21 @@
         state: present
       register: python3_psycopg2_output
 
-    # Step 6: Clone the git repository
+        # Step 6: Configure Git safe directory
+    - name: Configure Git safe directory
+      command: git config --global --add safe.directory "{{ local_repo }}"
+      become_user: "{{ deploy_user }}"
+
+    # Step 7: Ensure correct ownership of local_repo directory
+    - name: Ensure correct ownership of local_repo directory
+      file:
+        path: "{{ local_repo }}"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        recurse: yes
+
+    # Step 8: Clone the git repository
     - name: Clone the git repository
       git:
         repo: "{{ git_repo }}"
