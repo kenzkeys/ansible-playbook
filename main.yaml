@@ -1,189 +1,84 @@
 ---
 - name: Setup Boilerplate Application
-  hosts: hng
+  hosts: all
   become: yes
-
-  vars:
-    pg_admin_user: "admin"
-    pg_admin_password: "{{ lookup('password', '/dev/null length=20 chars=ascii_letters') }}"
-    app_dir: /opt/stage_5b
-
   tasks:
-    - name: Create hng user with sudo privileges
-      user:
-        name: hng
-        groups: sudo
-        append: yes
-
-    - name: Create /var/secrets directory
-      file:
-        path: /var/secrets
-        state: directory
-        owner: root
-        group: root
-        mode: '0700'
-
     - name: Install necessary packages
       apt:
-        name: "{{ item }}"
+        name:
+          - python3
+          - python3-venv
+          - python3-pip
+          - postgresql
+          - nginx
         state: present
         update_cache: yes
-      loop:
-        - git
-        - python3-pip
-        - python3-venv
-        - postgresql
-        - postgresql-contrib
-        - rabbitmq-server
-        - curl
-        - apt-transport-https
-        - ca-certificates
-        - software-properties-common
-
-    - name: Install Nginx 1.26
-      shell: |
-        echo "deb http://nginx.org/packages/ubuntu/ $(lsb_release -cs) nginx" | tee /etc/apt/sources.list.d/nginx.list
-        curl -fsSL https://nginx.org/keys/nginx_signing.key | apt-key add -
-        apt-get update
-        apt-get install -y nginx=1.26.*
-
-    - name: Clone the repository as root
-      git:
-        repo: 'https://github.com/hngprojects/hng_boilerplate_python_fastapi_web'
-        dest: "{{ app_dir }}"
-        version: devops
-        force: yes
-
-    - name: Install Python dependencies
-      pip:
-        requirements: "{{ app_dir }}/requirements.txt"
-        virtualenv: "{{ app_dir }}/venv"
-        virtualenv_command: /usr/bin/python3 -m venv
 
     - name: Ensure PostgreSQL service is running
-      service:
+      systemd:
         name: postgresql
         state: started
         enabled: yes
 
-    - name: Create PostgreSQL database and user
-      become: yes
+    - name: Create PostgreSQL user
       become_user: postgres
-      block:
-        - name: Create PostgreSQL database
-          postgresql_db:
-            name: stage_5b
-            encoding: UTF8
-            state: present
+      postgresql_user:
+        name: stage5buser
+        password: securepassword
 
-        - name: Create PostgreSQL user with password
-          postgresql_user:
-            name: "{{ pg_admin_user }}"
-            password: "{{ pg_admin_password }}"
-            priv: "ALL"
-            state: present
+    - name: Create PostgreSQL database
+      become_user: postgres
+      postgresql_db:
+        name: stage5bdb
+        owner: stage5buser
 
-    - name: Save PostgreSQL credentials to a file
-      copy:
-        dest: /var/secrets/pg_pw.txt
-        content: |
-          USER={{ pg_admin_user }}
-          PASSWORD={{ pg_admin_password }}
-        owner: root
-        group: root
-        mode: '0600'
+    - name: Grant privileges on the database to the user
+      become_user: postgres
+      postgresql_privs:
+        db: stage5bdb
+        role: stage5buser
+        privs: ALL
 
-    - name: Start the application
-      shell: "{{ app_dir }}/venv/bin/python3 {{ app_dir }}/main.py &"
+    - name: Install Python dependencies
+      pip:
+        requirements: /opt/stage_5b/requirements.txt
+        virtualenv: /opt/stage_5b/venv
 
-    - name: Configure Nginx
-      block:
-        - name: Remove default Nginx configuration
-          file:
-            path: /etc/nginx/sites-enabled/default
-            state: absent
-
-        - name: Set up Nginx reverse proxy
-          copy:
-            dest: /etc/nginx/sites-available/stage_5b
-            content: |
-              server {
-                  listen 80;
-                  server_name _;
-
-                  location / {
-                      proxy_pass http://127.0.0.1:3000;
-                      proxy_set_header Host $host;
-                      proxy_set_header X-Real-IP $remote_addr;
-                      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                      proxy_set_header X-Forwarded-Proto $scheme;
-                  }
-              }
-          notify: Restart nginx
-
-        - name: Enable stage_5b site
-          file:
-            src: /etc/nginx/sites-available/stage_5b
-            dest: /etc/nginx/sites-enabled/stage_5b
-            state: link
-
-    - name: Configure logging
-      block:
-        - name: Ensure log directory exists
-          file:
-            path: /var/log/stage_5b
-            state: directory
-
-        - name: Set up stderr and stdout logging
-          copy:
-            dest: /etc/systemd/system/stage_5b.service
-            content: |
-              [Unit]
-              Description=Stage 5B Application
-
-              [Service]
-              ExecStart={{ app_dir }}/venv/bin/python3 {{ app_dir }}/main.py
-              StandardOutput=file:/var/log/stage_5b/out.log
-              StandardError=file:/var/log/stage_5b/error.log
-              User=root
-              Group=root
-              Restart=always
-
-              [Install]
-              WantedBy=multi-user.target
-          notify: Reload systemd
-
-    - name: Change ownership of application directory
-      file:
-        path: "{{ app_dir }}"
-        state: directory
-        owner: hng
-        group: hng
-        recurse: yes
-
-    - name: Change ownership of log directory
+    - name: Create log directory
       file:
         path: /var/log/stage_5b
         state: directory
-        owner: hng
-        group: hng
-        recurse: yes
+        owner: www-data
+        group: www-data
 
-    - name: Change ownership of PostgreSQL credentials file
+    - name: Configure Nginx
+      copy:
+        src: /path/to/nginx/config
+        dest: /etc/nginx/sites-available/stage_5b
+      notify: restart nginx
+
+    - name: Enable Nginx site
       file:
-        path: /var/secrets/pg_pw.txt
-        owner: hng
-        group: hng
-        mode: '0600'
+        src: /etc/nginx/sites-available/stage_5b
+        dest: /etc/nginx/sites-enabled/stage_5b
+        state: link
+
+    - name: Remove default Nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: restart nginx
+
+    - name: Start the application
+      command: /opt/stage_5b/venv/bin/uvicorn main:app --host 127.0.0.1 --port 3000 --log-level info --log-config /opt/stage_5b/uvicorn_log_config.yaml
+      args:
+        chdir: /opt/stage_5b
+      environment:
+        PATH: "/opt/stage_5b/venv/bin:{{ ansible_env.PATH }}"
 
   handlers:
-    - name: Restart nginx
-      service:
+    - name: restart nginx
+      systemd:
         name: nginx
         state: restarted
-
-    - name: Reload systemd
-      systemd:
-        daemon_reload: yes
-        state: restarted
-        name: stage_5b.service
+        enabled: yes
