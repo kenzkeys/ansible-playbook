@@ -320,25 +320,25 @@
   # Logging in place with proper handlers for different steps
   post_tasks:
     - name: Log Step 6 Output
-      local_action: copy content="{{ git_output.stdout }}" dest="git_output.log"
-      when: git_output is defined
+      local_action: copy content="{{ git_output.stdout | default('') }}" dest="git_output.log"
+      when: git_output is defined and git_output.stdout is defined
 
     - name: Log Step 7 Output
-      local_action: copy content="{{ venv_output.stdout }}" dest="venv_output.log"
-      when: venv_output is defined
+      local_action: copy content="{{ venv_output.stdout | default('') }}" dest="venv_output.log"
+      when: venv_output is defined and venv_output.stdout is defined
 
     - name: Log Step 8 Output
-      local_action: copy content="{{ install_postgres_output.stdout }}" dest="install_postgres_output.log"
-      when: install_postgres_output is defined
+      local_action: copy content="{{ install_postgres_output.stdout | default('') }}" dest="install_postgres_output.log"
+      when: install_postgres_output is defined and install_postgres_output.stdout is defined
 
     - name: Log Step 9 Output
-      local_action: copy content="{{ copy_env.stdout }}" dest="copy_env_output.log"
-      when: copy_env is defined
+      local_action: copy content="{{ copy_env.stdout | default('') }}" dest="copy_env_output.log"
+      when: copy_env is defined and copy_env.stdout is defined
 
     - name: Log Step 10 Output
-      local_action: copy content="{{ uvicorn_output.stdout }}" dest="uvicorn_output.log"
-      when: uvicorn_output is defined
+      local_action: copy content="{{ uvicorn_output.stdout | default('') }}" dest="uvicorn_output.log"
+      when: uvicorn_output is defined and uvicorn_output.stdout is defined
 
     - name: Log Step 11 Output
-      local_action: copy content="{{ nginx_output.stdout }}" dest="nginx_output.log"
-      when: nginx_output is defined
+      local_action: copy content="{{ nginx_output.stdout | default('') }}" dest="nginx_output.log"
+      when: nginx_output is defined and nginx_output.stdout is defined
