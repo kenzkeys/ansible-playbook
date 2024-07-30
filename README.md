@@ -47,12 +47,12 @@ Before running the deployment, ensure you have the following:
 ## Deployment Process
 1. **Prepare the Ansible Playbook:**
    Ensure the `main.yaml` playbook is correctly configured with necessary variables:
-   ```yaml
-   ---
+---
+```
 - name: Deployment Setup
   hosts: hng
   become: yes
-
+  
   vars:
     git_branch: "devops"
     git_repo: "https://github.com/hngprojects/hng_boilerplate_python_fastapi_web.git"
@@ -93,9 +93,9 @@ Before running the deployment, ensure you have the following:
       lineinfile:
         path: /etc/sudoers
         state: present
-        regexp: '^%sudo'
-        line: '%sudo ALL=(ALL:ALL) ALL'
-        validate: '/usr/sbin/visudo -cf %s'
+        regexp: "^%sudo"
+        line: "%sudo ALL=(ALL:ALL) ALL"
+        validate: "/usr/sbin/visudo -cf %s"
 
     # Step 2: Create deploy_user and grant it sudo privileges
     - name: Install whois package
@@ -121,9 +121,9 @@ Before running the deployment, ensure you have the following:
       lineinfile:
         path: /etc/sudoers
         state: present
-        regexp: '^{{ deploy_user }}'
-        line: '{{ deploy_user }} ALL=(ALL) NOPASSWD:ALL'
-        validate: '/usr/sbin/visudo -cf %s'
+        regexp: "^{{ deploy_user }}"
+        line: "{{ deploy_user }} ALL=(ALL) NOPASSWD:ALL"
+        validate: "/usr/sbin/visudo -cf %s"
 
     # Step 3: Create directories with proper ownership and permissions
     - name: Create log_dir directory
@@ -132,7 +132,7 @@ Before running the deployment, ensure you have the following:
         state: directory
         owner: "{{ deploy_user }}"
         group: "{{ deploy_user }}"
-        mode: '0755'
+        mode: "0755"
 
     - name: Create local_repo directory
       file:
@@ -140,7 +140,7 @@ Before running the deployment, ensure you have the following:
         state: directory
         owner: "{{ deploy_user }}"
         group: "{{ deploy_user }}"
-        mode: '0755'
+        mode: "0755"
 
     - name: Create postgres_cred_dir directory
       file:
@@ -148,7 +148,7 @@ Before running the deployment, ensure you have the following:
         state: directory
         owner: "{{ deploy_user }}"
         group: "{{ deploy_user }}"
-        mode: '0755'
+        mode: "0755"
 
     # Step 4: Ensure files are present or create them with proper ownership and permissions
     - name: Ensure Log files are present
@@ -157,7 +157,7 @@ Before running the deployment, ensure you have the following:
         state: touch
         owner: "{{ deploy_user }}"
         group: "{{ deploy_user }}"
-        mode: '0644'
+        mode: "0644"
       with_items:
         - "{{ log_stderr }}"
         - "{{ log_stdout }}"
@@ -168,7 +168,7 @@ Before running the deployment, ensure you have the following:
         state: touch
         owner: "{{ deploy_user }}"
         group: "{{ deploy_user }}"
-        mode: '0600'
+        mode: "0600"
 
     ######################## LOGGING STARTS ########################
     # Step 5: Ensure required python packages are installed
@@ -275,7 +275,7 @@ Before running the deployment, ensure you have the following:
         dest: "{{ postgres_cred }}"
         owner: "{{ deploy_user }}"
         group: "{{ deploy_user }}"
-        mode: '0600'
+        mode: "0600"
 
     - name: Create a dummy table in PostgreSQL database
       become_user: postgres
@@ -296,31 +296,31 @@ Before running the deployment, ensure you have the following:
         dest: "{{ local_repo }}/.env"
         owner: "{{ deploy_user }}"
         group: "{{ deploy_user }}"
-        mode: '0644'
+        mode: "0644"
         remote_src: yes
 
     - name: Update .env file with Postgres URL
       lineinfile:
         path: "{{ local_repo }}/.env"
-        regexp: '^DB_URL='
+        regexp: "^DB_URL="
         line: "DB_URL=postgresql://{{ postgres_admin_user }}:{{ postgres_admin_password }}@localhost:5432/{{ postgres_db }}"
 
     - name: Update .env file with Postgres details
       lineinfile:
         path: "{{ local_repo }}/.env"
-        regexp: '^DB_NAME='
+        regexp: "^DB_NAME="
         line: "DB_NAME={{ postgres_db }}"
 
     - name: Update .env file with Postgres user
       lineinfile:
         path: "{{ local_repo }}/.env"
-        regexp: '^DB_USER='
+        regexp: "^DB_USER="
         line: "DB_USER={{ postgres_admin_user }}"
 
     - name: Update .env file with Postgres password
       lineinfile:
         path: "{{ local_repo }}/.env"
-        regexp: '^DB_PASSWORD='
+        regexp: "^DB_PASSWORD="
         line: "DB_PASSWORD={{ postgres_admin_password }}"
 
     # Step 12: Run the FastAPI application
@@ -392,7 +392,7 @@ Before running the deployment, ensure you have the following:
     - name: Log Step 11 Output
       local_action: copy content="{{ nginx_output.stdout | default('') }}" dest="nginx_output.log"
       when: nginx_output is defined and nginx_output.stdout is defined
-   ```
+```
 
 2. **Run the Playbook:**
    Execute the Ansible playbook to deploy the application:
